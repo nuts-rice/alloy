@@ -17,6 +17,8 @@ pub use eip7702::TxEip7702;
 
 /// [EIP-4844] constants, helpers, and types.
 pub mod eip4844;
+pub mod pooled;
+pub use pooled::PooledTransaction;
 
 use alloy_eips::eip4844::DATA_GAS_PER_BLOB;
 pub use alloy_eips::eip4844::{
@@ -39,6 +41,12 @@ pub use rlp::RlpEcdsaTx;
 
 mod typed;
 pub use typed::TypedTransaction;
+
+mod meta;
+pub use meta::{TransactionInfo, TransactionMeta};
+
+mod recovered;
+pub use recovered::{Recovered, SignerRecoverable};
 
 #[cfg(feature = "serde")]
 pub use legacy::signed_legacy_serde;
@@ -174,9 +182,9 @@ pub trait Transaction: Typed2718 + fmt::Debug + any::Any + Send + Sync + 'static
 /// A signable transaction.
 ///
 /// A transaction can have multiple signature types. This is usually
-/// [`alloy_primitives::Signature`], however, it may be different for future EIP-2718 transaction
-/// types, or in other networks. For example, in Optimism, the deposit transaction signature is the
-/// unit type `()`.
+/// [`alloy_primitives::PrimitiveSignature`], however, it may be different for future EIP-2718
+/// transaction types, or in other networks. For example, in Optimism, the deposit transaction
+/// signature is the unit type `()`.
 #[doc(alias = "SignableTx", alias = "TxSignable")]
 pub trait SignableTransaction<Signature>: Transaction {
     /// Sets `chain_id`.

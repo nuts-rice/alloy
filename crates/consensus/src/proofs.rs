@@ -7,6 +7,12 @@ use alloy_primitives::{keccak256, B256};
 use alloy_rlp::Encodable;
 use alloy_trie::root::{ordered_trie_root, ordered_trie_root_with_encoder};
 
+#[doc(inline)]
+pub use alloy_trie::root::{
+    state_root, state_root_ref_unhashed, state_root_unhashed, state_root_unsorted, storage_root,
+    storage_root_unhashed, storage_root_unsorted,
+};
+
 /// Calculate a transaction root.
 ///
 /// `(rlp(index), encoded(tx))` pairs.

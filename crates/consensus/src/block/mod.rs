@@ -6,8 +6,10 @@ pub use header::{BlockHeader, Header};
 #[cfg(all(feature = "serde", feature = "serde-bincode-compat"))]
 pub(crate) use header::serde_bincode_compat;
 
+use crate::{Transaction, Typed2718};
 use alloc::vec::Vec;
 use alloy_eips::eip4895::Withdrawals;
+use alloy_primitives::B256;
 use alloy_rlp::{Decodable, Encodable, RlpDecodable, RlpEncodable};
 
 /// Ethereum full block.
@@ -29,6 +31,29 @@ impl<T, H> Block<T, H> {
     /// Creates a new empty uncle block.
     pub fn uncle(header: H) -> Self {
         Self { header, body: Default::default() }
+    }
+}
+
+#[cfg(any(test, feature = "arbitrary"))]
+impl<'a, T> arbitrary::Arbitrary<'a> for Block<T>
+where
+    T: arbitrary::Arbitrary<'a>,
+{
+    fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        // first generate a reasonable amount of txs
+        let transactions = (0..u.int_in_range(0..=100)?)
+            .map(|_| T::arbitrary(u))
+            .collect::<arbitrary::Result<Vec<_>>>()?;
+
+        // then generate up to 2 ommers
+        let ommers = (0..u.int_in_range(0..=1)?)
+            .map(|_| Header::arbitrary(u))
+            .collect::<arbitrary::Result<Vec<_>>>()?;
+
+        Ok(Self {
+            header: u.arbitrary()?,
+            body: BlockBody { transactions, ommers, withdrawals: u.arbitrary()? },
+        })
     }
 }
 
@@ -57,6 +82,52 @@ impl<T> BlockBody<T> {
     #[inline]
     pub fn transactions(&self) -> impl Iterator<Item = &T> + '_ {
         self.transactions.iter()
+    }
+
+    /// Create a [`Block`] from the body and its header.
+    pub const fn into_block(self, header: Header) -> Block<T> {
+        Block { header, body: self }
+    }
+}
+
+impl<T> BlockBody<T> {
+    /// Calculate the ommers root for the block body.
+    pub fn calculate_ommers_root(&self) -> B256 {
+        crate::proofs::calculate_ommers_root(&self.ommers)
+    }
+
+    /// Calculate the withdrawals root for the block body, if withdrawals exist. If there are no
+    /// withdrawals, this will return `None`.
+    pub fn calculate_withdrawals_root(&self) -> Option<B256> {
+        self.withdrawals.as_ref().map(|w| crate::proofs::calculate_withdrawals_root(w))
+    }
+}
+
+impl<T: Transaction> BlockBody<T> {
+    /// Returns an iterator over all blob versioned hashes from the block body.
+    #[inline]
+    pub fn blob_versioned_hashes_iter(&self) -> impl Iterator<Item = &B256> + '_ {
+        self.eip4844_transactions_iter().filter_map(|tx| tx.blob_versioned_hashes()).flatten()
+    }
+}
+
+impl<T: Typed2718> BlockBody<T> {
+    /// Returns whether or not the block body contains any blob transactions.
+    #[inline]
+    pub fn has_eip4844_transactions(&self) -> bool {
+        self.transactions.iter().any(|tx| tx.is_eip4844())
+    }
+
+    /// Returns whether or not the block body contains any EIP-7702 transactions.
+    #[inline]
+    pub fn has_eip7702_transactions(&self) -> bool {
+        self.transactions.iter().any(|tx| tx.is_eip7702())
+    }
+
+    /// Returns an iterator over all blob transactions of the block.
+    #[inline]
+    pub fn eip4844_transactions_iter(&self) -> impl Iterator<Item = &T> + '_ {
+        self.transactions.iter().filter(|tx| tx.is_eip4844())
     }
 }
 

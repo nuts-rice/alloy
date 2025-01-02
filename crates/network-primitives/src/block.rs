@@ -46,6 +46,33 @@ impl<T> BlockTransactions<T> {
         matches!(self, Self::Full(_))
     }
 
+    /// Converts the transaction type by applying a function to each transaction.
+    ///
+    /// Returns the block with the new transaction type.
+    pub fn map<U>(self, f: impl FnMut(T) -> U) -> BlockTransactions<U> {
+        match self {
+            Self::Full(txs) => BlockTransactions::Full(txs.into_iter().map(f).collect()),
+            Self::Hashes(hashes) => BlockTransactions::Hashes(hashes),
+            Self::Uncle => BlockTransactions::Uncle,
+        }
+    }
+
+    /// Converts the transaction type by applying a fallible function to each transaction.
+    ///
+    /// Returns the block with the new transaction type if all transactions were successfully.
+    pub fn try_map<U, E>(
+        self,
+        f: impl FnMut(T) -> Result<U, E>,
+    ) -> Result<BlockTransactions<U>, E> {
+        match self {
+            Self::Full(txs) => {
+                Ok(BlockTransactions::Full(txs.into_iter().map(f).collect::<Result<_, _>>()?))
+            }
+            Self::Hashes(hashes) => Ok(BlockTransactions::Hashes(hashes)),
+            Self::Uncle => Ok(BlockTransactions::Uncle),
+        }
+    }
+
     /// Fallibly cast to a slice of transactions.
     ///
     /// Returns `None` if the enum variant is not `Full`.
@@ -79,6 +106,16 @@ impl<T> BlockTransactions<T> {
         }
     }
 
+    /// Consumes the type and returns the transactions as a vector.
+    ///
+    /// Note: if this is an uncle or hashes, this will return an empty vector.
+    pub fn into_transactions_vec(self) -> Vec<T> {
+        match self {
+            Self::Full(txs) => txs,
+            _ => vec![],
+        }
+    }
+
     /// Returns an instance of BlockTransactions with the Uncle special case.
     #[inline]
     pub const fn uncle() -> Self {
@@ -103,6 +140,11 @@ impl<T> BlockTransactions<T> {
 }
 
 impl<T: TransactionResponse> BlockTransactions<T> {
+    /// Creates a new [`BlockTransactions::Hashes`] variant from the given iterator of transactions.
+    pub fn new_hashes(txs: impl IntoIterator<Item = impl AsRef<T>>) -> Self {
+        Self::Hashes(txs.into_iter().map(|tx| tx.as_ref().tx_hash()).collect())
+    }
+
     /// Converts `self` into `Hashes`.
     #[inline]
     pub fn convert_to_hashes(&mut self) {

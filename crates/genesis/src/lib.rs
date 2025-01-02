@@ -12,6 +12,7 @@
 extern crate alloc;
 
 use alloc::{collections::BTreeMap, string::String};
+use alloy_eips::eip7840::BlobScheduleItem;
 use alloy_primitives::{keccak256, Address, Bytes, B256, U256};
 use alloy_serde::{storage::deserialize_storage_map, ttd::deserialize_json_ttd_opt, OtherFields};
 use alloy_trie::{TrieAccount, EMPTY_ROOT_HASH, KECCAK_EMPTY};
@@ -56,10 +57,10 @@ pub struct Genesis {
     pub base_fee_per_gas: Option<u128>,
     /// The genesis header excess blob gas
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
-    pub excess_blob_gas: Option<u128>,
+    pub excess_blob_gas: Option<u64>,
     /// The genesis header blob gas used
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
-    pub blob_gas_used: Option<u128>,
+    pub blob_gas_used: Option<u64>,
     /// The genesis block number
     #[serde(default, skip_serializing_if = "Option::is_none", with = "alloy_serde::quantity::opt")]
     pub number: Option<u64>,
@@ -169,13 +170,13 @@ impl Genesis {
     }
 
     /// Set the excess blob gas.
-    pub const fn with_excess_blob_gas(mut self, excess_blob_gas: Option<u128>) -> Self {
+    pub const fn with_excess_blob_gas(mut self, excess_blob_gas: Option<u64>) -> Self {
         self.excess_blob_gas = excess_blob_gas;
         self
     }
 
     /// Set the blob gas used.
-    pub const fn with_blob_gas_used(mut self, blob_gas_used: Option<u128>) -> Self {
+    pub const fn with_blob_gas_used(mut self, blob_gas_used: Option<u64>) -> Self {
         self.blob_gas_used = blob_gas_used;
         self
     }
@@ -479,6 +480,12 @@ pub struct ChainConfig {
     /// The deposit contract address
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub deposit_contract_address: Option<Address>,
+
+    /// The blob schedule for the chain, indexed by hardfork name.
+    ///
+    /// See [EIP-7840](https://github.com/ethereum/EIPs/tree/master/EIPS/eip-7840.md).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub blob_schedule: BTreeMap<String, BlobScheduleItem>,
 }
 
 impl ChainConfig {
@@ -604,6 +611,7 @@ impl Default for ChainConfig {
             parlia: None,
             extra_fields: Default::default(),
             deposit_contract_address: None,
+            blob_schedule: Default::default(),
         }
     }
 }

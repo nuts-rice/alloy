@@ -24,6 +24,8 @@ pub use sidecar::*;
 
 use alloy_primitives::{b256, FixedBytes, B256, U256};
 
+use crate::eip7840;
+
 /// The modulus of the BLS group used in the KZG commitment scheme. All field
 /// elements contained in a blob MUST be STRICTLY LESS than this value.
 pub const BLS_MODULUS_BYTES: B256 =
@@ -35,6 +37,9 @@ pub const BLS_MODULUS: U256 = U256::from_be_bytes(BLS_MODULUS_BYTES.0);
 
 /// Size a single field element in bytes.
 pub const FIELD_ELEMENT_BYTES: u64 = 32;
+
+/// Size a single field element in bytes.
+pub const FIELD_ELEMENT_BYTES_USIZE: usize = FIELD_ELEMENT_BYTES as usize;
 
 /// How many field elements are stored in a single data blob.
 pub const FIELD_ELEMENTS_PER_BLOB: u64 = 4096;
@@ -125,7 +130,8 @@ pub fn kzg_to_versioned_hash(commitment: &[u8]) -> B256 {
 /// (`calc_excess_blob_gas`).
 #[inline]
 pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_used: u64) -> u64 {
-    (parent_excess_blob_gas + parent_blob_gas_used).saturating_sub(TARGET_DATA_GAS_PER_BLOCK)
+    eip7840::BlobParams::cancun()
+        .next_block_excess_blob_gas(parent_excess_blob_gas, parent_blob_gas_used)
 }
 
 /// Calculates the blob gas price from the header's excess blob gas field.
@@ -134,11 +140,7 @@ pub const fn calc_excess_blob_gas(parent_excess_blob_gas: u64, parent_blob_gas_u
 /// (`get_blob_gasprice`).
 #[inline]
 pub const fn calc_blob_gasprice(excess_blob_gas: u64) -> u128 {
-    fake_exponential(
-        BLOB_TX_MIN_BLOB_GASPRICE,
-        excess_blob_gas as u128,
-        BLOB_GASPRICE_UPDATE_FRACTION,
-    )
+    eip7840::BlobParams::cancun().calc_blob_fee(excess_blob_gas)
 }
 
 /// Approximates `factor * e ** (numerator / denominator)` using Taylor expansion.
